@@ -1,7 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -11,32 +14,87 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController bioController = TextEditingController();
+  final nameController = TextEditingController();
+  final bioController = TextEditingController();
 
-  File? selectedImage;
+  final user = FirebaseAuth.instance.currentUser;
+
+  File? imageFile;
   bool isLoading = false;
 
-  final ImagePicker picker = ImagePicker();
+  final picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserData();
+  }
+
+  Future<void> loadUserData() async {
+    var doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(user!.uid)
+        .get();
+
+    var data = doc.data();
+
+    if (data != null) {
+      nameController.text = data["name"] ?? "";
+      bioController.text = data["bio"] ?? "";
+    }
+  }
 
   Future<void> pickImage() async {
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70,
-    );
+    final picked = await picker.pickImage(source: ImageSource.gallery);
 
-    if (image != null) {
+    if (picked != null) {
       setState(() {
-        selectedImage = File(image.path);
+        imageFile = File(picked.path);
       });
     }
   }
 
-  @override
-  void dispose() {
-    nameController.dispose();
-    bioController.dispose();
-    super.dispose();
+  Future<String?> uploadImage(File file) async {
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child("profile/${user!.uid}.jpg");
+
+      await ref.putFile(file);
+
+      return await ref.getDownloadURL();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> saveProfile() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    String? imageUrl;
+
+    if (imageFile != null) {
+      imageUrl = await uploadImage(imageFile!);
+    }
+
+    await FirebaseFirestore.instance
+        .collection("users")
+        .doc(user!.uid)
+        .update({
+      "name": nameController.text.trim(),
+      "bio": bioController.text.trim(),
+      if (imageUrl != null) "image": imageUrl,
+    });
+
+    setState(() {
+      isLoading = false;
+    });
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -44,8 +102,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("Edit Profile"),
         backgroundColor: Colors.black,
+        title: const Text("Edit Profile"),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -55,29 +113,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             GestureDetector(
               onTap: pickImage,
               child: CircleAvatar(
-                radius: 60,
+                radius: 55,
                 backgroundColor: Colors.grey.shade800,
-                backgroundImage: selectedImage != null
-                    ? FileImage(selectedImage!)
-                    : null,
-                child: selectedImage == null
-                    ? const Icon(
-                        Icons.camera_alt,
-                        size: 40,
-                        color: Colors.white,
-                      )
+                backgroundImage:
+                    imageFile != null ? FileImage(imageFile!) : null,
+                child: imageFile == null
+                    ? const Icon(Icons.camera_alt, size: 40)
                     : null,
               ),
             ),
 
-            const SizedBox(height: 15),
-
-            const Text(
-              "Tap to change profile photo",
-              style: TextStyle(color: Colors.white70),
-            ),
-
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
 
             TextField(
               controller: nameController,
@@ -87,26 +133,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 labelStyle: const TextStyle(color: Colors.white70),
                 filled: true,
                 fillColor: Colors.grey.shade900,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
 
             TextField(
               controller: bioController,
-              maxLines: 3,
               style: const TextStyle(color: Colors.white),
+              maxLines: 3,
               decoration: InputDecoration(
                 labelText: "Bio",
                 labelStyle: const TextStyle(color: Colors.white70),
                 filled: true,
                 fillColor: Colors.grey.shade900,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
               ),
             ),
 
@@ -114,12 +154,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             SizedBox(
               width: double.infinity,
-              height: 55,
+              height: 50,
               child: ElevatedButton(
-                onPressed: () {
-                  // Save code Part 2 में आएगा
-                },
-                child: const Text("Save"),
+                onPressed: isLoading ? null : saveProfile,
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("Save"),
               ),
             ),
           ],

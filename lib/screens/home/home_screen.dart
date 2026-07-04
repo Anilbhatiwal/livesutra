@@ -1,52 +1,89 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: 10,
-      itemBuilder: (context, index) {
-        return Container(
-          margin: const EdgeInsets.all(10),
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: Colors.black87,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const CircleAvatar(
-                radius: 25,
-                backgroundColor: Colors.red,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: const Text("LiveSutra Feed"),
+      ),
+      body: StreamBuilder(
+        stream: FirebaseFirestore.instance
+            .collection("posts")
+            .orderBy("createdAt", descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+
+  if (snapshot.hasError) {
+    return Center(
+      child: Text(
+        snapshot.error.toString(),
+        style: const TextStyle(color: Colors.white),
+      ),
+    );
+  }
+
+  if (snapshot.connectionState == ConnectionState.waiting) {
+    return const Center(
+      child: CircularProgressIndicator(),
+    );
+  }
+
+  if (!snapshot.hasData) {
+    return const Center(
+      child: Text(
+        "No Data",
+        style: TextStyle(color: Colors.white),
+      ),
+    );
+  }
+
+  final docs = snapshot.data!.docs;
+
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              var data = docs[index];
+
+              return Card(
+                color: Colors.grey.shade900,
+                margin: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "User ${index + 1}",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+
+                    ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Colors.grey,
+                        child: Icon(Icons.person),
+                      ),
+                      title: Text(
+                        data['userName'] ?? '',
+                        style: const TextStyle(color: Colors.white),
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      "Go live now and earn gifts 🎁",
-                      style: TextStyle(color: Colors.grey),
+
+                    Image.network(data['imageUrl']),
+
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Text(
+                        data['caption'] ?? '',
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const Icon(Icons.live_tv, color: Colors.red),
-            ],
-          ),
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
