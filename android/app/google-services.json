@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "364110402575",
+    "project_id": "livesutra-2ac28",
+    "storage_bucket": "livesutra-2ac28.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:364110402575:android:b2020bdb5337360afc7f7a",
+        "android_client_info": {
+          "package_name": "com.anil.livesutra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFz3JNqhEiSqgy9edRcEzSzAMyraWVtIQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
