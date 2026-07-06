@@ -21,6 +21,7 @@ dependencies:
   firebase_storage: ^12.4.10
   image_picker: ^1.1.2
   cached_network_image: ^3.4.1
+  zego_express_engine: ^3.21.0
 
 dev_dependencies:
   flutter_test:
