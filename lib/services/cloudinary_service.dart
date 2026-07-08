@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
 
 class CloudinaryService {
   static const String cloudName = "mxbtvwdp";
@@ -40,7 +41,7 @@ class CloudinaryService {
 
       return null;
     } catch (e) {
-      print(e);
+      debugPrint(e.toString());
       return null;
     }
   }

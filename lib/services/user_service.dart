@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/user_model.dart';
+import 'package:flutter/material.dart';
 
 class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -24,7 +25,7 @@ class UserService {
         doc.data() as Map<String, dynamic>,
       );
     } catch (e) {
-      print("Get User Error: $e");
+      debugPrint(e.toString());
       return null;
     }
   }
