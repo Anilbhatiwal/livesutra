@@ -261,18 +261,11 @@ class _LiveScreenState extends State<LiveScreen> {
                             MaterialPageRoute(
 
                               builder: (_) => LiveRoomScreen(
-
-                                isHost: false,
-
-                                liveID: live.liveId,
-
-                                hostID: live.hostId,
-
-                                hostName: live.hostName,
-
-                                hostImage: live.hostImage,
-
-                              ),
+  isHost: false,
+  live: live,
+  userId: "viewer_001", // baad me Firebase UID
+  userName: "Guest",    // baad me Firebase Display Name
+),
 
                             ),
 
@@ -484,15 +477,12 @@ class _LiveScreenState extends State<LiveScreen> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) =>
-                                                  LiveRoomScreen(
-                                                isHost: false,
-                                                liveID: live.liveId,
-                                                hostID: live.hostId,
-                                                hostName: live.hostName,
-                                                hostImage:
-                                                    live.hostImage,
-                                              ),
+                                              builder: (_) => LiveRoomScreen(
+  isHost: false,
+  live: live,
+  userId: "viewer_001",
+  userName: "Guest",
+),
                                             ),
                                           );
                                         },

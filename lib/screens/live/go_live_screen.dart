@@ -90,48 +90,58 @@ final userData = userDoc.data() ?? {};
     final liveID = generateLiveID();
 
     final live = LiveModel(
+  liveId: liveID,
+  streamId: liveID,
 
-      liveId: liveID,
+  hostId: user.uid,
+  hostName: userData["name"] ?? user.displayName ?? "",
+  hostImage: userData["image"] ?? user.photoURL ?? "",
 
-      hostId: user.uid,
+  title: titleController.text,
+  category: selectedCategory,
+  thumbnail: "",
 
-      hostName: userData["name"] ?? "Host",
+  isLive: true,
 
-hostImage: userData["photoUrl"] ?? "",
+  viewers: 0,
+  likes: 0,
+  diamonds: 0,
 
-      viewers: 0,
-
-      isLive: true,
-
-      startedAt: DateTime.now(),
-
-    );
+  startedAt: DateTime.now(),
+  createdAt: DateTime.now(),
+);
 
     try {
-  debugPrint("Creating Live Room...");
+      debugPrint("STEP 1");
 
+  debugPrint("Creating Live Room...");
+ 
+  debugPrint("STEP 2");
   await LiveService.createLive(live);
 
+debugPrint("STEP 3");
   debugPrint("Live Room Created Successfully");
 
   setState(() {
     loading = false;
   });
 
+debugPrint("STEP 4");
   if (!mounted) return;
 
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => LiveRoomScreen(
-        isHost: true,
-        liveID: liveID,
-        hostID: user.uid,
-        hostName: user.displayName ?? user.email ?? "Host",
-        hostImage: user.photoURL ?? "",
-      ),
+debugPrint("STEP 5");
+  Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => LiveRoomScreen(
+      live: live,
+      userId: user.uid,
+      userName: user.displayName ?? "",
+      isHost: true,
     ),
-  );
+  ),
+);
+debugPrint("STEP 6");
 } catch (e) {
   debugPrint("Live Create Error: $e");
 

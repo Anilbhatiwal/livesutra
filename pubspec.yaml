@@ -1,5 +1,5 @@
 name: livesutra
-description: "A new Flutter project."
+description: "A BIGO Style Live Streaming App"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -13,15 +13,56 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  # Firebase
   firebase_core: ^3.3.0
   firebase_auth: ^5.1.0
   cloud_firestore: ^5.4.0
+  firebase_storage: ^12.4.10
+  firebase_messaging: ^15.2.10
+
+  # State Management
+  provider: ^6.1.5
+
+  # Live Streaming
+  zego_express_engine: ^3.21.0
+
+  # Network
   http: ^1.2.1
 
-  firebase_storage: ^12.4.10
+  # Images
   image_picker: ^1.1.2
   cached_network_image: ^3.4.1
-  zego_express_engine: ^3.21.0
+  flutter_image_compress: ^2.4.0
+
+  # Permissions
+  permission_handler: ^12.0.1
+
+  # Local Storage
+  shared_preferences: ^2.5.3
+
+  # Notifications
+  flutter_local_notifications: ^19.4.0
+
+  # Date & Time
+  intl: ^0.20.2
+
+  # Loading
+  flutter_easyloading: ^3.0.5
+
+  # Animation
+  lottie: ^3.3.2
+
+  # UUID
+  uuid: ^4.5.1
+
+  # Audio
+  audioplayers: ^6.5.1
+
+  # Chat Auto Scroll
+  scrollable_positioned_list: ^0.3.8
+
+  # Environment Variables
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -34,7 +75,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/LiveSutra_logo.png
+    - assets/images/
+    - .env
 
 flutter_native_splash:
   color: "#000000"
