@@ -1,987 +1,287 @@
+// ignore_for_file: unused_element, unused_element_parameter
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:zego_express_engine/zego_express_engine.dart';
 
 import '../../controllers/live_room_controller.dart';
 import '../../models/live_model.dart';
 
+import 'widgets/live_video_view.dart';
+import 'widgets/live_chat_list.dart';
+import 'widgets/live_top_bar.dart';
+import 'widgets/live_bottom_bar.dart';
 
-class LiveRoomScreen extends StatefulWidget {
-
-
+class LiveRoomScreen extends StatelessWidget {
   const LiveRoomScreen({
-
     super.key,
-
     required this.live,
-
     required this.userId,
-
     required this.userName,
-
+    required this.userImage,
     required this.isHost,
-
   });
 
-
-
   final LiveModel live;
-
-
   final String userId;
-
-
   final String userName;
-
-
+  final String userImage;
   final bool isHost;
-
-
-
-
-  @override
-  State<LiveRoomScreen> createState() =>
-      _LiveRoomScreenState();
-
-}
-
-
-
-
-
-class _LiveRoomScreenState
-    extends State<LiveRoomScreen> {
-
-
-
-  late LiveRoomController controller;
-
-
-
-
-  @override
-  void initState() {
-
-    super.initState();
-
-
-
-    controller =
-        LiveRoomController(
-
-          live: widget.live,
-
-          userId: widget.userId,
-
-          userName: widget.userName,
-
-          isHost: widget.isHost,
-
-        );
-
-
-
-    controller.initialize();
-
-
-
-    controller.registerZegoCallbacks();
-
-
-  }
-
-
-
-
-
-  @override
-  void dispose() {
-
-
-    controller.dispose();
-
-
-    super.dispose();
-
-
-  }
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
-
-
-
-    return ChangeNotifierProvider.value(
-
-
-      value: controller,
-
-
-
-      child: Scaffold(
-
-
-        backgroundColor: Colors.black,
-
-
-
-        body: Consumer<LiveRoomController>(
-
-
-          builder:
-              (context, liveController, child) {
-
-
-
-            if(!liveController.isInitialized){
-
-
-              return const Center(
-
-                child:
-                    CircularProgressIndicator(
-
-                  color: Colors.white,
-
-                ),
-
-              );
-
-            }
-
-
-
-
-            return Stack(
-
-              children: [
-
-
-
-                Positioned.fill(
-
-                  child:
-
-                  _buildVideoView(),
-
-                ),
-
-
-
-
-                Positioned(
-
-                  top: 0,
-
-                  left: 0,
-
-                  right: 0,
-
-                  child:
-
-                  _buildTopBar(
-
-                    liveController,
-
-                  ),
-
-                ),
-
-
-
-
-                Positioned(
-
-                  left: 0,
-
-                  right: 0,
-
-                  bottom: 0,
-
-                  child:
-
-                  _buildBottomControls(
-
-                    liveController,
-
-                  ),
-
-                ),
-
-
-              ],
-
-            );
-
-
-
-          },
-
-        ),
-
+    return ChangeNotifierProvider(
+      create: (_) => LiveRoomController(
+        live: live,
+        userId: userId,
+        userName: userName,
+        userImage: userImage,
+        isHost: isHost,
+      )..initialize(),
+      child: _LiveRoomBody(
+        live: live,
+        isHost: isHost,
       ),
-
     );
-
-
   }
+}
 
+class _LiveRoomBody extends StatelessWidget {
+  final LiveModel live;
+  final bool isHost;
 
+  const _LiveRoomBody({
+    super.key,
+    required this.live,
+    required this.isHost,
+  });
 
+  @override
+  Widget build(BuildContext context) {
+    final controller = Provider.of<LiveRoomController>(context);
+    final liveData = controller.live;
 
-
-  Widget _buildVideoView() {
-    return FutureBuilder<Widget?>(
-      future: ZegoExpressEngine.instance.createCanvasView((viewID) {
-        if (widget.isHost) {
-          // Host ke liye local camera preview
-          ZegoExpressEngine.instance.startPreview(
-            canvas: ZegoCanvas(viewID),
-          );
-        } else {
-          // Audience/Viewer ke liye host ki stream play karna
-          ZegoExpressEngine.instance.startPlayingStream(
-            widget.live.streamId, // Agar aapke LiveModel mein stream id ka naam alag hai to vo likhein (e.g. widget.live.streamId)
-            canvas: ZegoCanvas(viewID),
-          );
-        }
-      }),
-      builder: (context, AsyncSnapshot<Widget?> snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData || snapshot.data == null) {
-          return const Center(
-            child: CircularProgressIndicator(
-              color: Colors.white,
-            ),
-          );
-        }
-
-        return Container(
-          color: Colors.black,
-          child: snapshot.data!,
-        );
+    return PopScope(
+      canPop: false, 
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _onExit(context, controller);
       },
-    );
-  }
-    Widget _buildTopBar(
-      LiveRoomController liveController,
-      ) {
-
-
-    return SafeArea(
-
-      child: Padding(
-
-        padding:
-        const EdgeInsets.all(12),
-
-
-        child: Row(
-
-
-          mainAxisAlignment:
-          MainAxisAlignment.spaceBetween,
-
-
-
-          children: [
-
-
-
-            Container(
-
-              padding:
-              const EdgeInsets.symmetric(
-
-                horizontal: 12,
-
-                vertical: 8,
-
-              ),
-
-
-              decoration:
-              BoxDecoration(
-
-                color:
-                Colors.black54,
-
-
-                borderRadius:
-                BorderRadius.circular(20),
-
-              ),
-
-
-
-              child: Row(
-
-
-                children: [
-
-
-
-                  CircleAvatar(
-
-                    radius: 16,
-
-
-                    backgroundColor:
-                    Colors.white24,
-
-
-                    child: Text(
-
-                      widget.userName.isNotEmpty
-
-                          ? widget.userName[0]
-
-                          : "U",
-
-
-                      style:
-                      const TextStyle(
-
-                        color:
-                        Colors.white,
-
-                      ),
-
-                    ),
-
-                  ),
-
-
-
-                  const SizedBox(
-
-                    width: 8,
-
-                  ),
-
-
-
-                  Text(
-
-                    widget.userName,
-
-
-                    style:
-                    const TextStyle(
-
-                      color:
-                      Colors.white,
-
-                      fontWeight:
-                      FontWeight.bold,
-
-                    ),
-
-                  ),
-
-
-                ],
-
-              ),
-
-            ),
-
-
-
-
-            Row(
-
-              children: [
-
-
-
-                Container(
-
-                  padding:
-                  const EdgeInsets.symmetric(
-
-                    horizontal: 12,
-
-                    vertical: 8,
-
-                  ),
-
-
-                  decoration:
-                  BoxDecoration(
-
-                    color:
-                    Colors.black54,
-
-
-                    borderRadius:
-                    BorderRadius.circular(20),
-
-                  ),
-
-
-
-                  child: Row(
-
-                    children: [
-
-
-
-                      const Icon(
-
-                        Icons.people,
-
-                        color:
-                        Colors.white,
-
-                        size:
-                        18,
-
-                      ),
-
-
-
-                      const SizedBox(
-
-                        width: 5,
-
-                      ),
-
-
-
-                      Text(
-
-                        liveController
-                            .viewerCount
-                            .toString(),
-
-
-                        style:
-                        const TextStyle(
-
-                          color:
-                          Colors.white,
-
-                        ),
-
-                      ),
-
-
-                    ],
-
-                  ),
-
-                ),
-
-
-
-
-                const SizedBox(
-
-                  width: 8,
-
-                ),
-
-
-
-                GestureDetector(
-
-
-                  onTap: (){
-
-
-                    controller.leaveLive();
-
-
-                    Navigator.pop(context);
-
-
-                  },
-
-
-
-                  child: Container(
-
-
-                    padding:
-                    const EdgeInsets.all(8),
-
-
-                    decoration:
-                    const BoxDecoration(
-
-                      color:
-                      Colors.red,
-
-                      shape:
-                      BoxShape.circle,
-
-                    ),
-
-
-
-                    child:
-                    const Icon(
-
-                      Icons.close,
-
-                      color:
-                      Colors.white,
-
-                    ),
-
-
-                  ),
-
-                ),
-
-
-              ],
-
-            ),
-
-
-
-          ],
-
-
-        ),
-
-      ),
-
-    );
-
-  }
-
-
-
-
-
-
-
-  Widget _buildBottomControls(
-      LiveRoomController liveController,
-      ) {
-
-
-    return SafeArea(
-
-
-      child: Padding(
-
-
-        padding:
-        const EdgeInsets.all(12),
-
-
-
-        child: Column(
-
-
-          mainAxisAlignment:
-          MainAxisAlignment.end,
-
-
-
-          children: [
-
-
-
-            _buildChatBox(),
-
-
-
-
-            const SizedBox(
-
-              height: 10,
-
-            ),
-
-
-
-
-            Row(
-
-
-              mainAxisAlignment:
-              MainAxisAlignment.spaceAround,
-
-
-
-              children: [
-
-
-
-                _button(
-
-                  Icons.mic,
-
-                      (){
-
-                    liveController.toggleMic();
-
-                  },
-
-                ),
-
-
-
-
-                _button(
-
-                  Icons.cameraswitch,
-
-                      (){
-
-                    liveController.switchCamera();
-
-                  },
-
-                ),
-
-
-
-
-
-                _button(
-
-                  Icons.favorite,
-
-                      (){
-
-                    liveController.sendLike();
-
-                  },
-
-                ),
-
-
-
-
-
-                _button(
-
-                  Icons.card_giftcard,
-
-                      (){
-
-                    _showGiftPanel();
-
-                  },
-
-                ),
-
-
-
-
-                _button(
-
-                  Icons.exit_to_app,
-
-                      (){
-
-
-                    liveController.leaveLive();
-
-
-                    Navigator.pop(context);
-
-
-                  },
-
-
-                  color:
-                  Colors.red,
-
-                ),
-
-
-
-              ],
-
-
-            ),
-
-
-          ],
-
-        ),
-
-      ),
-
-    );
-
-  }
-
-
-
-
-
-
-
-  Widget _button(
-
-      IconData icon,
-
-      VoidCallback onTap,
-
-      {
-
-      Color color = Colors.white,
-
-      }
-
-      ){
-
-
-    return GestureDetector(
-
-
-      onTap: onTap,
-
-
-      child: Container(
-
-
-        height: 48,
-
-        width: 48,
-
-
-        decoration:
-        const BoxDecoration(
-
-          color:
-          Colors.black54,
-
-          shape:
-          BoxShape.circle,
-
-        ),
-
-
-
-        child:
-        Icon(
-
-          icon,
-
-          color:
-          color,
-
-        ),
-
-
-      ),
-
-    );
-
-  }
-
-
-
-
-
-
-
-
-  Widget _buildChatBox(){
-
-
-    return Container(
-
-
-      height: 120,
-
-
-      padding:
-      const EdgeInsets.all(8),
-
-
-
-      decoration:
-      BoxDecoration(
-
-        color:
-        Colors.black45,
-
-
-        borderRadius:
-        BorderRadius.circular(12),
-
-      ),
-
-
-
-      child: Column(
-
-
-        children: [
-
-
-
-          Expanded(
-
-
-            child: ListView.builder(
-
-
-              itemCount:
-              controller.messages.length,
-
-
-
-              itemBuilder:
-                  (context,index){
-
-
-
-                final msg =
-                controller.messages[index];
-
-
-
-                return Text(
-
-                  "${msg.senderName}: ${msg.message}",
-
-
-                  style:
-                  const TextStyle(
-
-                    color:
-                    Colors.white,
-
-                  ),
-
-                );
-
-
-              },
-
-            ),
-
-          ),
-
-
-
-
-          Row(
-
-
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
             children: [
-
-
-
-              Expanded(
-
-
-                child: TextField(
-
-
-                  controller:
-                  controller.chatController,
-
-
-
-                  style:
-                  const TextStyle(
-
-                    color:
-                    Colors.white,
-
-                  ),
-
-
-
-                  decoration:
-                  const InputDecoration(
-
-                    hintText:
-                    "Type message",
-
-
-                    hintStyle:
-                    TextStyle(
-
-                      color:
-                      Colors.white54,
-
-                    ),
-
-                  ),
-
-                ),
-
+              ///------------------------------------------------------------
+              /// Live Video
+              ///------------------------------------------------------------
+              const Positioned.fill(
+                child: LiveVideoView(),
               ),
 
-
-
-              IconButton(
-
-
-                onPressed: (){
-
-
-                  controller.sendMessage();
-
-
-                },
-
-
-                icon:
-                const Icon(
-
-                  Icons.send,
-
-                  color:
-                  Colors.white,
-
+              ///------------------------------------------------------------
+              /// Top Bar
+              ///------------------------------------------------------------
+              Positioned(
+                top: 12,
+                left: 12,
+                right: 12,
+                child: LiveTopBar(
+                  hostName: liveData.hostName,
+                  hostImage: liveData.hostImage,
+                  viewerCount: controller.viewerCount,
+                  onClose: () async {
+                    await _onExit(context, controller);
+                  },
                 ),
-
               ),
 
+              ///------------------------------------------------------------
+              /// Chat
+              ///------------------------------------------------------------
+              Positioned(
+                left: 10,
+                right: 90,
+                bottom: 90,
+                top: 90,
+                child: LiveChatList(
+                  roomId: liveData.liveId,
+                  controller: controller,
+                  onSend: controller.sendMessage,
+                  onHeart: () => controller.sendHeart(),
+                  onGift: (giftId, giftName, diamonds) => controller.sendGift(
+                    giftId: giftId,
+                    giftName: giftName,
+                    diamonds: diamonds,
+                  ),
+                  isHost: isHost,
+                ),
+              ),
+
+              ///------------------------------------------------------------
+              /// Viewer Count
+              ///------------------------------------------------------------
+              Positioned(
+                top: 70,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.remove_red_eye, color: Colors.white, size: 18),
+                      const SizedBox(width: 5),
+                      Text(
+                        controller.viewerCount.toString(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              ///------------------------------------------------------------
+              /// Likes Counter
+              ///------------------------------------------------------------
+              Positioned(
+                top: 120,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.pink.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.favorite, color: Colors.white, size: 18),
+                      const SizedBox(width: 5),
+                      Text(
+                        controller.likes.toString(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              ///------------------------------------------------------------
+              /// Diamonds Counter
+              ///------------------------------------------------------------
+              Positioned(
+                top: 170,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.90),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.diamond, color: Colors.white, size: 18),
+                      const SizedBox(width: 5),
+                      Text(
+                        controller.diamonds.toString(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              ///------------------------------------------------------------
+              /// Loading State
+              ///------------------------------------------------------------
+              if (controller.loading)
+                _loadingWidget(),
+
+              ///------------------------------------------------------------
+              /// Bottom Controls
+              ///------------------------------------------------------------
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: LiveBottomBar(
+                  controller: controller.messageController, 
+                  onSend: () => controller.sendMessage(controller.messageController.text),
+                  onHeart: () => controller.sendHeart(), 
+                  // FIXED: Yahan parameters hata diye kyunki LiveBottomBar ka onGift parameter accept nahi kar raha tha.
+                  onGift: () => controller.sendGift(
+                    giftId: "default_gift_id",
+                    giftName: "Rose",
+                    diamonds: 10,
+                  ),
+                  isHost: isHost,
+                  micOn: controller.micOn,
+                  cameraOn: controller.cameraOn,
+                  onMic: () => controller.toggleMute(), 
+                  onCamera: () => controller.toggleCamera(),
+                  onSwitchCamera: () => controller.switchCamera(),
+                ),
+              ),
             ],
-
-
           ),
-
-
-        ],
-
-
+        ),
       ),
-
-
     );
-
-
   }
 
-
-
-
-
-
-  void _showGiftPanel(){
-
-
-    controller.sendGift(
-
-      giftId: "gift1",
-
-      giftName: "Rose",
-
-      diamonds: 10,
-
-    );
-
-
+  ///------------------------------------------------------------
+  /// Exit Confirmation
+  ///------------------------------------------------------------
+  Future<bool> _onExit(
+    BuildContext context,
+    LiveRoomController controller,
+  ) async {
+    try {
+      await controller.leaveRoom();
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+      return true;
+    } catch (e) {
+      debugPrint("Exit Live Error : $e");
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+      return true;
+    }
   }
 
+  ///------------------------------------------------------------
+  /// Error Widget
+  ///------------------------------------------------------------
+  Widget _errorWidget(String message) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
 
+  ///------------------------------------------------------------
+  /// Loading Widget
+  ///------------------------------------------------------------
+  Widget _loadingWidget() {
+    return const Center(
+      child: CircularProgressIndicator(),
+    );
+  }
 }

@@ -137,6 +137,7 @@ debugPrint("STEP 5");
       live: live,
       userId: user.uid,
       userName: user.displayName ?? "",
+      userImage: user.photoURL ?? "",
       isHost: true,
     ),
   ),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'go_live_screen.dart';
 import '../../models/live_model.dart';
@@ -240,38 +241,28 @@ class _LiveScreenState extends State<LiveScreen> {
                     ),
 
                     itemBuilder: (context, index) {
+  final data = filtered[index].data() as Map<String, dynamic>;
+  final live = LiveModel.fromMap(data);
+  
+  // 1. Ise yahan bilkul top par likhein (Widget return hone se pehle)
+  final user = FirebaseAuth.instance.currentUser;
 
-                      final data =
-                          filtered[index].data()
-                              as Map<String, dynamic>;
-
-                      final live = LiveModel.fromMap(data);
-
-                      return InkWell(
-
-                        borderRadius:
-                            BorderRadius.circular(18),
-
-                        onTap: () {
-
-                          Navigator.push(
-
-                            context,
-
-                            MaterialPageRoute(
-
-                              builder: (_) => LiveRoomScreen(
-  isHost: false,
-  live: live,
-  userId: "viewer_001", // baad me Firebase UID
-  userName: "Guest",    // baad me Firebase Display Name
-),
-
-                            ),
-
-                          );
-
-                        },
+  return InkWell(
+    borderRadius: BorderRadius.circular(18),
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LiveRoomScreen(
+            isHost: false,
+            live: live,
+            userId: user?.uid ?? "",          // 2. Ab yeh sahi kaam karega
+            userName: user?.displayName ?? "Guest",
+            userImage: user?.photoURL ?? "",
+          ),
+        ),
+      );
+    },
 
                         child: Container(
 
@@ -473,19 +464,21 @@ class _LiveScreenState extends State<LiveScreen> {
                                     SizedBox(
                                       width: double.infinity,
                                       child: ElevatedButton.icon(
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => LiveRoomScreen(
-  isHost: false,
-  live: live,
-  userId: "viewer_001",
-  userName: "Guest",
-),
-                                            ),
-                                          );
-                                        },
+                                        /// ElevatedButton ke andar ka code
+onPressed: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => LiveRoomScreen(
+        isHost: false,
+        live: live,
+        userId: user?.uid ?? "",          // Ab yahan bhi error nahi aayega
+        userName: user?.displayName ?? "Guest",
+        userImage: user?.photoURL ?? "",
+      ),
+    ),
+  );
+},
                                         icon: const Icon(
                                           Icons.play_arrow,
                                           color: Colors.white,

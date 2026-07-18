@@ -24,7 +24,7 @@ dependencies:
   provider: ^6.1.5
 
   # Live Streaming
-  zego_express_engine: ^3.21.0
+  zego_express_engine: ^3.24.1
 
   # Network
   http: ^1.2.1
@@ -76,7 +76,6 @@ flutter:
 
   assets:
     - assets/images/
-    - .env
 
 flutter_native_splash:
   color: "#000000"
