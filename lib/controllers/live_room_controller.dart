@@ -50,6 +50,13 @@ class LiveRoomController extends ChangeNotifier {
   bool _micOn = true;
   bool _speakerOn = true;
 
+  bool _connected = false;
+bool _reconnecting = false;
+
+String _connectionText = "Connecting...";
+
+int _networkQuality = 0;
+
   int _viewerCount = 0;
   int _likes = 0;
   int _diamonds = 0;
@@ -82,6 +89,14 @@ class LiveRoomController extends ChangeNotifier {
   bool get micOn => _micOn;
 
   bool get speakerOn => _speakerOn;
+
+  bool get connected => _connected;
+
+bool get reconnecting => _reconnecting;
+
+String get connectionText => _connectionText;
+
+int get networkQuality => _networkQuality;
 
   int get viewerCount => _viewerCount;
 
@@ -119,6 +134,31 @@ class LiveRoomController extends ChangeNotifier {
         userName: userName,
       );
 
+      ZegoService.registerCallbacks(
+  onRoomConnected: () {
+    _connected = true;
+    _reconnecting = false;
+    _connectionText = "Connected";
+    notifyListeners();
+  },
+
+  onRoomDisconnected: () {
+    _connected = false;
+    _connectionText = "Disconnected";
+    notifyListeners();
+  },
+
+  onPublishQuality: (quality) {
+    _networkQuality = quality.index;
+    notifyListeners();
+  },
+
+  onPlayQuality: (quality) {
+    _networkQuality = quality.index;
+    notifyListeners();
+  },
+);
+
       if (isHost) {
         await _initializeHost();
       } else {
@@ -128,6 +168,10 @@ class LiveRoomController extends ChangeNotifier {
       _listenRoom();
       _listenChat();
       _listenGifts();
+
+      _connected = true;
+_reconnecting = false;
+_connectionText = "Connected";
 
       _initialized = true;
     } catch (e) {
@@ -613,20 +657,36 @@ class LiveRoomController extends ChangeNotifier {
   ///------------------------------------------------------------
 
   Future<void> reconnect() async {
-    try {
-      await leaveRoom();
+  if (_reconnecting) return;
 
-      await Future.delayed(
-        const Duration(seconds: 1),
-      );
+  _reconnecting = true;
+  _connectionText = "Reconnecting...";
+  notifyListeners();
 
-      await initialize();
-    } catch (e) {
-      debugPrint(
-        "Reconnect Error : $e",
-      );
-    }
+  try {
+    await leaveRoom();
+
+    await Future.delayed(
+      const Duration(seconds: 2),
+    );
+
+    await initialize();
+
+    _connected = true;
+    _reconnecting = false;
+    _connectionText = "Connected";
+  } catch (e) {
+    _connected = false;
+    _reconnecting = false;
+    _connectionText = "Reconnect Failed";
+
+    debugPrint(
+      "Reconnect Error : $e",
+    );
   }
+
+  notifyListeners();
+}
 
   ///------------------------------------------------------------
   /// Close Controller
