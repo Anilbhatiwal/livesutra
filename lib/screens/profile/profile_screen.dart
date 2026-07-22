@@ -5,21 +5,40 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/welcome_screen.dart';
 import 'edit_profile_screen.dart';
 
+
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+
+  const ProfileScreen({
+    super.key,
+  });
+
 
   @override
   State<ProfileScreen> createState() =>
       _ProfileScreenState();
+
 }
+
+
 
 class _ProfileScreenState
     extends State<ProfileScreen> {
 
-  final user =
+
+  final User? user =
       FirebaseAuth.instance.currentUser;
 
+
+
   Stream<DocumentSnapshot> getUserData() {
+
+
+    if(user == null){
+
+      return const Stream.empty();
+
+    }
+
 
     return FirebaseFirestore.instance
         .collection("users")
@@ -28,26 +47,161 @@ class _ProfileScreenState
 
   }
 
+
+
+  Widget statBox(
+      String title,
+      dynamic value,
+  ){
+
+    return Column(
+
+      children: [
+
+        Text(
+
+          value.toString(),
+
+          style: const TextStyle(
+
+            color: Colors.white,
+
+            fontSize: 18,
+
+            fontWeight:
+                FontWeight.bold,
+
+          ),
+
+        ),
+
+
+        const SizedBox(height:5),
+
+
+        Text(
+
+          title,
+
+          style: const TextStyle(
+
+            color: Colors.grey,
+
+          ),
+
+        ),
+
+      ],
+
+    );
+
+  }
+
+
+
+  Widget menuTile(
+      IconData icon,
+      String title,
+  ){
+
+    return Container(
+
+      margin:
+          const EdgeInsets.symmetric(
+              vertical: 6),
+
+      decoration: BoxDecoration(
+
+        color:
+            Colors.grey.shade900,
+
+        borderRadius:
+            BorderRadius.circular(12),
+
+      ),
+
+
+      child: ListTile(
+
+        leading: Icon(
+
+          icon,
+
+          color: Colors.white,
+
+        ),
+
+
+        title: Text(
+
+          title,
+
+          style:
+              const TextStyle(
+
+            color: Colors.white,
+
+          ),
+
+        ),
+
+
+        trailing:
+
+            const Icon(
+
+              Icons.arrow_forward_ios,
+
+              size:15,
+
+              color: Colors.grey,
+
+            ),
+
+      ),
+
+    );
+
+  }
+
+
+
+
+
   @override
   Widget build(BuildContext context) {
 
+
     return Scaffold(
 
-      backgroundColor: Colors.black,
+      backgroundColor:
+          Colors.black,
+
 
       appBar: AppBar(
 
-        backgroundColor: Colors.black,
+        backgroundColor:
+            Colors.black,
 
-        title: const Text("Profile"),
+
+        title:
+            const Text(
+              "Profile",
+            ),
+
 
         actions: [
 
           IconButton(
 
-            icon: const Icon(Icons.edit),
+            icon:
+                const Icon(
+                  Icons.edit,
+                ),
 
-            onPressed: () {
+
+            onPressed: (){
+
 
               Navigator.push(
 
@@ -62,6 +216,7 @@ class _ProfileScreenState
 
               );
 
+
             },
 
           )
@@ -70,197 +225,434 @@ class _ProfileScreenState
 
       ),
 
-      body: StreamBuilder<DocumentSnapshot>(
 
-        stream: getUserData(),
 
-        builder: (context, snapshot) {
+      body:
 
-          if (snapshot.connectionState ==
-              ConnectionState.waiting) {
+      StreamBuilder<DocumentSnapshot>(
+
+
+        stream:
+            getUserData(),
+
+
+        builder:
+            (context,snapshot){
+
+
+
+          if(snapshot.connectionState ==
+              ConnectionState.waiting){
+
 
             return const Center(
 
-              child: CircularProgressIndicator(),
+              child:
+                  CircularProgressIndicator(),
 
             );
 
+
           }
 
-          if (!snapshot.hasData ||
-              !snapshot.data!.exists) {
+
+
+
+          if(!snapshot.hasData ||
+              !snapshot.data!.exists){
+
 
             return const Center(
 
-              child: Text(
+              child:
+
+              Text(
 
                 "No Profile Data",
 
-                style: TextStyle(
-                  color: Colors.white,
-                ),
+                style:
+                    TextStyle(
+                      color:
+                      Colors.white,
+                    ),
 
               ),
 
             );
 
+
           }
 
+
+
+
           final data =
-              snapshot.data!.data()
-                  as Map<String, dynamic>;
+          snapshot.data!.data()
+          as Map<String,dynamic>;
+
+
 
           String photoUrl =
               data["photoUrl"] ?? "";
 
-          return Center(
+
+
+          return SingleChildScrollView(
+
+            padding:
+                const EdgeInsets.all(20),
+
 
             child: Column(
 
-              mainAxisAlignment:
-                  MainAxisAlignment.center,
-
               children: [
+
+
 
                 CircleAvatar(
 
-                  radius: 55,
+                  radius:60,
 
                   backgroundColor:
                       Colors.grey.shade800,
 
+
                   backgroundImage:
 
-                      photoUrl.isNotEmpty
+                  photoUrl.isNotEmpty
 
-                          ? NetworkImage(photoUrl)
+                      ? NetworkImage(photoUrl)
 
-                          : null,
+                      : null,
+
 
                   child:
 
-                      photoUrl.isEmpty
+                  photoUrl.isEmpty
 
-                          ? const Icon(
+                      ? const Icon(
 
-                              Icons.person,
+                    Icons.person,
 
-                              size: 50,
+                    size:60,
 
-                            )
+                    color:Colors.white,
 
-                          : null,
+                  )
+
+                      : null,
 
                 ),
 
-                const SizedBox(height: 20),
 
-                Text(
 
-                  data["name"] ??
-                      "No Name",
 
-                  style:
+                const SizedBox(height:15),
+
+
+
+
+                Row(
+
+                  mainAxisAlignment:
+                      MainAxisAlignment.center,
+
+                  children: [
+
+
+                    Text(
+
+                      data["name"] ??
+                          "User",
+
+                      style:
                       const TextStyle(
 
-                    color: Colors.white,
+                        color:
+                        Colors.white,
 
-                    fontSize: 22,
+                        fontSize:22,
 
-                    fontWeight:
+                        fontWeight:
                         FontWeight.bold,
-
-                  ),
-
-                ),
-
-                const SizedBox(height: 8),
-
-                Text(
-
-                  data["email"] ??
-                      "",
-
-                  style:
-                      const TextStyle(
-
-                    color: Colors.grey,
-
-                  ),
-
-                ),
-
-                const SizedBox(height: 12),
-
-                Text(
-
-                  data["bio"] ??
-                      "",
-
-                  textAlign:
-                      TextAlign.center,
-
-                  style:
-                      const TextStyle(
-
-                    color:
-                        Colors.white70,
-
-                    fontSize: 15,
-
-                  ),
-
-                ),
-
-                const SizedBox(height: 35),
-
-                ElevatedButton(
-
-                  style:
-                      ElevatedButton.styleFrom(
-
-                    backgroundColor:
-                        Colors.red,
-
-                  ),
-
-                  onPressed: () async {
-
-                    await FirebaseAuth
-                        .instance
-                        .signOut();
-
-                    if (!context.mounted) {
-                      return;
-                    }
-
-                    Navigator.pushAndRemoveUntil(
-
-                      context,
-
-                      MaterialPageRoute(
-
-                        builder: (_) =>
-                            const WelcomeScreen(),
 
                       ),
 
-                      (route) => false,
+                    ),
 
-                    );
 
-                  },
 
-                  child:
-                      const Text("Logout"),
+                    const SizedBox(width:8),
+
+
+
+                    Container(
+
+                      padding:
+                      const EdgeInsets.symmetric(
+                        horizontal:8,
+                        vertical:3,
+                      ),
+
+                      decoration:
+                      BoxDecoration(
+
+                        color:
+                        Colors.orange,
+
+                        borderRadius:
+                        BorderRadius.circular(10),
+
+                      ),
+
+                      child:
+                      Text(
+
+                        "VIP ${data["vipLevel"] ?? 0}",
+
+                        style:
+                        const TextStyle(
+
+                          color:
+                          Colors.black,
+
+                          fontSize:12,
+
+                          fontWeight:
+                          FontWeight.bold,
+
+                        ),
+
+                      ),
+
+                    )
+
+
+                  ],
 
                 ),
+
+
+
+                const SizedBox(height:8),
+
+
+
+                Text(
+
+                  "Level ${data["level"] ?? 1}",
+
+                  style:
+                  const TextStyle(
+
+                    color:
+                    Colors.amber,
+
+                  ),
+
+                ),
+
+
+
+
+                const SizedBox(height:20),
+
+
+
+
+                Container(
+
+                  padding:
+                  const EdgeInsets.all(18),
+
+
+                  decoration:
+                  BoxDecoration(
+
+                    color:
+                    Colors.grey.shade900,
+
+                    borderRadius:
+                    BorderRadius.circular(15),
+
+                  ),
+
+
+                  child: Row(
+
+                    mainAxisAlignment:
+                    MainAxisAlignment.spaceAround,
+
+
+                    children: [
+
+
+                      statBox(
+                        "Coins",
+                        data["coins"] ?? 0,
+                      ),
+
+
+                      statBox(
+                        "Diamonds",
+                        data["diamonds"] ?? 0,
+                      ),
+
+
+                    ],
+
+                  ),
+
+                ),
+
+
+
+
+                const SizedBox(height:20),
+
+
+
+
+                Row(
+
+                  mainAxisAlignment:
+                  MainAxisAlignment.spaceAround,
+
+
+                  children: [
+
+
+                    statBox(
+                      "Followers",
+                      data["followers"] ?? 0,
+                    ),
+
+
+                    statBox(
+                      "Following",
+                      data["following"] ?? 0,
+                    ),
+
+
+                    statBox(
+                      "Likes",
+                      data["likes"] ?? 0,
+                    ),
+
+
+                  ],
+
+                ),
+
+
+
+
+                const SizedBox(height:30),
+
+
+
+
+                menuTile(
+                    Icons.account_balance_wallet,
+                    "Wallet"
+                ),
+
+
+                menuTile(
+                    Icons.card_giftcard,
+                    "My Gifts"
+                ),
+
+
+                menuTile(
+                    Icons.video_library,
+                    "Live History"
+                ),
+
+
+                menuTile(
+                    Icons.settings,
+                    "Settings"
+                ),
+
+
+
+
+
+                const SizedBox(height:20),
+
+
+
+
+                SizedBox(
+
+                  width:
+                  double.infinity,
+
+
+                  child:
+                  ElevatedButton(
+
+                    style:
+                    ElevatedButton.styleFrom(
+
+                      backgroundColor:
+                      Colors.red,
+
+                    ),
+
+
+                    onPressed: () async {
+
+
+                      await FirebaseAuth
+                          .instance
+                          .signOut();
+
+
+
+                      if(!context.mounted)
+                        return;
+
+
+
+                      Navigator.pushAndRemoveUntil(
+
+                        context,
+
+                        MaterialPageRoute(
+
+                          builder: (_) =>
+                          const WelcomeScreen(),
+
+                        ),
+
+                            (route)=>false,
+
+                      );
+
+
+                    },
+
+
+                    child:
+                    const Text(
+                      "Logout",
+                    ),
+
+                  ),
+
+                )
+
+
 
               ],
 
             ),
 
           );
+
+
 
         },
 
