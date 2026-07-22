@@ -4,22 +4,44 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:zego_express_engine/zego_express_engine.dart';
 
+enum ZegoEngineStatus {
+  notInitialized,
+  initializing,
+  initialized,
+  destroying,
+  destroyed,
+}
 
 class ZegoService {
   ZegoService._();
+
+  //==============================================================
+  // App Configuration
+  //==============================================================
 
   static const int appID = 1826378765;
 
   static const String appSign =
       "fa745741653f22c62ed997c8b3de170e1b46ddfe1bf44c874b11791745337f9c";
 
-  static bool _initialized = false;
+  //==============================================================
+  // Engine State
+  //==============================================================
 
-  static bool get isInitialized => _initialized;
+  static ZegoEngineStatus _engineStatus =
+      ZegoEngineStatus.notInitialized;
+
+  static bool _initialized = false;
 
   static bool _loggedIn = false;
 
-  static bool get isLoggedIn => _loggedIn;
+  static bool _initializing = false;
+
+  static bool _destroying = false;
+
+  //==============================================================
+  // Room Information
+  //==============================================================
 
   static String? _currentRoomID;
 
@@ -27,53 +49,226 @@ class ZegoService {
 
   static String? _currentUserName;
 
-  static Future<void> init() async {
-    if (_initialized) return;
+  //==============================================================
+  // Stream Information
+  //==============================================================
 
-    final profile = ZegoEngineProfile(
-      appID,
-      ZegoScenario.Broadcast,
-      appSign: appSign,
-    );
+  static String? _currentPublishStreamID;
 
-    await ZegoExpressEngine.createEngineWithProfile(
-      profile,
-    );
+  static final Set<String> _playingStreams = {};
 
-    _initialized = true;
+  //==============================================================
+  // Video Views
+  //==============================================================
 
-    debugPrint(
-      "Zego Engine Initialized",
-    );
+  static int? _localViewID;
+
+  static Widget? _localPreviewWidget;
+
+  static bool _previewStarted = false;
+
+  static final Map<String, int> _remoteViewIDs = {};
+
+  static final Map<String, Widget?> _remoteWidgets = {};
+
+  //==============================================================
+  // Device State
+  //==============================================================
+
+  static bool _cameraEnabled = true;
+
+  static bool _microphoneEnabled = true;
+
+  static bool _speakerEnabled = true;
+
+  static bool _frontCamera = true;
+
+  static bool _beautyEnabled = false;
+
+  static bool _mirrorEnabled = false;
+
+  //==============================================================
+  // Video Configuration
+  //==============================================================
+
+  static int _videoWidth = 720;
+
+  static int _videoHeight = 1280;
+
+  static int _videoFPS = 30;
+
+  static int _videoBitrate = 1800;
+
+  //==============================================================
+  // Logger
+  //==============================================================
+
+  static void _log(String message) {
+    if (kDebugMode) {
+      debugPrint("[ZEGO] $message");
+    }
   }
+
+  static void _logError(Object error) {
+    if (kDebugMode) {
+      debugPrint("[ZEGO ERROR] $error");
+    }
+  }
+
+  //==============================================================
+  // Engine Status
+  //==============================================================
+
+  static bool get isInitialized => _initialized;
+
+  static bool get isLoggedIn => _loggedIn;
+
+  static ZegoEngineStatus get engineStatus =>
+      _engineStatus;
+
+  //==============================================================
+  // Initialize Engine
+  //==============================================================
+
+  static Future<void> init() async {
+    if (_initialized) {
+      _log("Engine already initialized.");
+      return;
+    }
+
+    if (_initializing) {
+      _log("Engine initialization already running.");
+      return;
+    }
+
+    _initializing = true;
+
+    _engineStatus = ZegoEngineStatus.initializing;
+
+    try {
+      final profile = ZegoEngineProfile(
+        appID,
+        ZegoScenario.Broadcast,
+        appSign: appSign,
+      );
+
+      await ZegoExpressEngine.createEngineWithProfile(
+        profile,
+      );
+
+      _initialized = true;
+
+      _engineStatus =
+          ZegoEngineStatus.initialized;
+
+      _log("Engine initialized successfully.");
+    } catch (e) {
+      _logError(e);
+
+      _initialized = false;
+
+      _engineStatus =
+          ZegoEngineStatus.notInitialized;
+
+      rethrow;
+    } finally {
+      _initializing = false;
+    }
+  }
+  //==============================================================
+  // Destroy Engine
+  //==============================================================
 
   static Future<void> destroy() async {
     if (!_initialized) return;
 
+    if (_destroying) return;
+
+    _destroying = true;
+
+    _engineStatus = ZegoEngineStatus.destroying;
+
     try {
       if (_loggedIn && _currentRoomID != null) {
-        await logoutRoom(
-          _currentRoomID!,
-        );
+        await logoutRoom(_currentRoomID!);
       }
-    } catch (_) {}
 
-    await ZegoExpressEngine.destroyEngine();
+      if (_localViewID != null) {
+        try {
+          await ZegoExpressEngine.instance
+              .destroyCanvasView(_localViewID!);
+        } catch (_) {}
 
-    _initialized = false;
+        _localViewID = null;
+      }
+
+      for (final viewID in _remoteViewIDs.values) {
+        try {
+          await ZegoExpressEngine.instance
+              .destroyCanvasView(viewID);
+        } catch (_) {}
+      }
+
+      _remoteViewIDs.clear();
+      _remoteWidgets.clear();
+      _playingStreams.clear();
+
+      await ZegoExpressEngine.destroyEngine();
+
+      _initialized = false;
+
+      _engineStatus = ZegoEngineStatus.destroyed;
+
+      _log("Engine destroyed successfully.");
+    } catch (e) {
+      _logError(e);
+      rethrow;
+    } finally {
+      _destroying = false;
+    }
+  }
+
+  //==============================================================
+  // Reset
+  //==============================================================
+
+  static void reset() {
     _loggedIn = false;
 
     _currentRoomID = null;
     _currentUserID = null;
     _currentUserName = null;
 
-    debugPrint(
-      "Zego Engine Destroyed",
-    );
+    _currentPublishStreamID = null;
+
+    _playingStreams.clear();
+
+    _localViewID = null;
+
+    _localPreviewWidget = null;
+
+    _remoteViewIDs.clear();
+
+    _remoteWidgets.clear();
+
+    _cameraEnabled = true;
+    _microphoneEnabled = true;
+    _speakerEnabled = true;
+    _frontCamera = true;
+    _beautyEnabled = false;
+    _mirrorEnabled = false;
+
+    _videoWidth = 720;
+    _videoHeight = 1280;
+    _videoFPS = 30;
+    _videoBitrate = 1800;
+
+    _engineStatus = ZegoEngineStatus.notInitialized;
   }
-    ///------------------------------------------------------------
-  /// Login Room
-  ///------------------------------------------------------------
+
+  //==============================================================
+  // Login Room
+  //==============================================================
 
   static Future<void> loginRoom({
     required String roomID,
@@ -85,6 +280,7 @@ class ZegoService {
     }
 
     if (_loggedIn && _currentRoomID == roomID) {
+      _log("Already logged into room.");
       return;
     }
 
@@ -111,256 +307,598 @@ class ZegoService {
     _currentUserID = userID;
     _currentUserName = userName;
 
-    debugPrint(
-      "Room Login Success : $roomID",
-    );
+    _log("Room login success : $roomID");
   }
 
-  ///------------------------------------------------------------
-  /// Logout Room
-  ///------------------------------------------------------------
+  //==============================================================
+  // Logout Room
+  //==============================================================
 
   static Future<void> logoutRoom(
     String roomID,
   ) async {
     if (!_loggedIn) return;
 
-    await ZegoExpressEngine.instance.logoutRoom(
-      roomID,
-    );
+    try {
+      await ZegoExpressEngine.instance.logoutRoom(
+        roomID,
+      );
 
-    _loggedIn = false;
+      _loggedIn = false;
 
-    _currentRoomID = null;
-    _currentUserID = null;
-    _currentUserName = null;
+      _currentRoomID = null;
+      _currentUserID = null;
+      _currentUserName = null;
 
-    debugPrint(
-      "Room Logout Success",
-    );
+      _currentPublishStreamID = null;
+
+      _playingStreams.clear();
+
+      _log("Room logout success.");
+    } catch (e) {
+      _logError(e);
+      rethrow;
+    }
+  }
+    //==============================================================
+  // Create Local Preview Canvas
+  //==============================================================
+
+  static Future<Widget?> createLocalPreview() async {
+    if (!_initialized) {
+      await init();
+    }
+
+    if (_localPreviewWidget != null) {
+      return _localPreviewWidget;
+    }
+
+    try {
+      _localPreviewWidget =
+          await ZegoExpressEngine.instance.createCanvasView(
+        (viewID) async {
+          _localViewID = viewID;
+
+          final canvas = ZegoCanvas.view(viewID);
+
+          await ZegoExpressEngine.instance.startPreview(
+            canvas: canvas,
+          );
+        },
+      );
+
+      _log("Local preview created.");
+
+      return _localPreviewWidget;
+    } catch (e) {
+      _logError(e);
+      return null;
+    }
   }
 
-  ///------------------------------------------------------------
-  /// Start Preview
-  ///------------------------------------------------------------
+  //==============================================================
+  // Start Preview
+  //==============================================================
 
-  static Future<void> startPreview() async {
-  final canvas = ZegoCanvas.view(0);
+  static Future<Widget?> startPreview() async {
+  if (!_initialized) {
+    await init();
+  }
 
-  await ZegoExpressEngine.instance.startPreview(
-    canvas: canvas,
+  if (_previewStarted && _localPreviewWidget != null) {
+    return _localPreviewWidget;
+  }
+
+  _localPreviewWidget =
+      await ZegoExpressEngine.instance.createCanvasView(
+    (viewID) async {
+      _localViewID = viewID;
+    },
   );
 
-  _localViewID = 0;
-}
+  if (_localViewID != null) {
+    final canvas = ZegoCanvas.view(_localViewID!);
 
-  ///------------------------------------------------------------
-  /// Stop Preview
-  ///------------------------------------------------------------
+    await ZegoExpressEngine.instance.startPreview(
+      canvas: canvas,
+    );
 
-  static Future<void> stopPreview() async {
-    await ZegoExpressEngine.instance.stopPreview();
+    _previewStarted = true;
   }
 
-  ///------------------------------------------------------------
-  /// Start Publishing
-  ///------------------------------------------------------------
+  return _localPreviewWidget;
+}
+  //==============================================================
+  // Stop Preview
+  //==============================================================
+
+  static Future<void> stopPreview() async {
+    try {
+      await ZegoExpressEngine.instance.stopPreview();
+
+      _previewStarted = false;
+
+      if (_localViewID != null) {
+        await ZegoExpressEngine.instance.destroyCanvasView(
+          _localViewID!,
+        );
+
+        _localViewID = null;
+      }
+
+      _localPreviewWidget = null;
+
+      _log("Preview stopped.");
+    } catch (e) {
+      _logError(e);
+    }
+  }
+
+  //==============================================================
+  // Start Publishing
+  //==============================================================
 
   static Future<void> startPublishing({
     required String streamID,
   }) async {
-    await ZegoExpressEngine.instance.startPublishingStream(
-      streamID,
-    );
+    if (!_loggedIn) {
+      throw Exception(
+        "Please login room before publishing.",
+      );
+    }
+
+    try {
+      _currentPublishStreamID = streamID;
+
+      await ZegoExpressEngine.instance
+          .startPublishingStream(
+        streamID,
+      );
+
+      _log("Publishing started : $streamID");
+    } catch (e) {
+      _currentPublishStreamID = null;
+
+      _logError(e);
+
+      rethrow;
+    }
   }
 
-  ///------------------------------------------------------------
-  /// Stop Publishing
-  ///------------------------------------------------------------
+  //==============================================================
+  // Stop Publishing
+  //==============================================================
 
   static Future<void> stopPublishing() async {
-    await ZegoExpressEngine.instance.stopPublishingStream();
+    try {
+      await ZegoExpressEngine.instance
+          .stopPublishingStream();
+
+      _currentPublishStreamID = null;
+
+      _log("Publishing stopped.");
+    } catch (e) {
+      _logError(e);
+    }
   }
 
-  ///------------------------------------------------------------
-  /// Start Playing
-  ///------------------------------------------------------------
+  //==============================================================
+  // Is Publishing
+  //==============================================================
+
+  static bool get isPublishing =>
+      _currentPublishStreamID != null;
+        //==============================================================
+  // Create Remote Canvas
+  //==============================================================
+
+  static Future<Widget?> createRemoteView({
+    required String streamID,
+  }) async {
+    if (_remoteWidgets.containsKey(streamID)) {
+      return _remoteWidgets[streamID];
+    }
+
+    try {
+      final widget =
+          await ZegoExpressEngine.instance.createCanvasView(
+        (viewID) async {
+          _remoteViewIDs[streamID] = viewID;
+
+          final canvas = ZegoCanvas.view(viewID);
+
+          await ZegoExpressEngine.instance.startPlayingStream(
+            streamID,
+            canvas: canvas,
+          );
+
+          _playingStreams.add(streamID);
+        },
+      );
+
+      _remoteWidgets[streamID] = widget;
+
+      _log("Remote canvas created : $streamID");
+
+      return widget;
+    } catch (e) {
+      _logError(e);
+      return null;
+    }
+  }
+
+  //==============================================================
+  // Start Playing
+  //==============================================================
 
   static Future<void> startPlaying({
-  required String streamID,
-}) async {
-  final canvas = ZegoCanvas.view(0);
+    required String streamID,
+  }) async {
+    if (_playingStreams.contains(streamID)) {
+      return;
+    }
 
-  await ZegoExpressEngine.instance.startPlayingStream(
-    streamID,
-    canvas: canvas,
-  );
+    try {
+      if (_remoteViewIDs.containsKey(streamID)) {
+        final canvas = ZegoCanvas.view(
+          _remoteViewIDs[streamID]!,
+        );
 
-  _remoteViews[streamID] = 0;
-}
+        await ZegoExpressEngine.instance.startPlayingStream(
+          streamID,
+          canvas: canvas,
+        );
 
-  ///------------------------------------------------------------
-  /// Stop Playing
-  ///------------------------------------------------------------
+        _playingStreams.add(streamID);
+
+        _log("Playing started : $streamID");
+      } else {
+        await createRemoteView(
+          streamID: streamID,
+        );
+      }
+    } catch (e) {
+      _logError(e);
+      rethrow;
+    }
+  }
+
+  //==============================================================
+  // Stop Playing
+  //==============================================================
 
   static Future<void> stopPlaying({
     required String streamID,
   }) async {
-    await ZegoExpressEngine.instance.stopPlayingStream(
-      streamID,
-    );
+    try {
+      await ZegoExpressEngine.instance.stopPlayingStream(
+        streamID,
+      );
+
+      if (_remoteViewIDs.containsKey(streamID)) {
+        await ZegoExpressEngine.instance.destroyCanvasView(
+          _remoteViewIDs[streamID]!,
+        );
+
+        _remoteViewIDs.remove(streamID);
+      }
+
+      _remoteWidgets.remove(streamID);
+
+      _playingStreams.remove(streamID);
+
+      _log("Playing stopped : $streamID");
+    } catch (e) {
+      _logError(e);
+    }
   }
-    ///------------------------------------------------------------
-  /// Camera
-  ///------------------------------------------------------------
+
+  //==============================================================
+  // Stop All Playing Streams
+  //==============================================================
+
+  static Future<void> stopAllPlaying() async {
+    final streams = List<String>.from(
+      _playingStreams,
+    );
+
+    for (final streamID in streams) {
+      await stopPlaying(
+        streamID: streamID,
+      );
+    }
+  }
+
+  //==============================================================
+  // Get Remote Widget
+  //==============================================================
+
+  static Widget? getRemoteWidget(
+    String streamID,
+  ) {
+    return _remoteWidgets[streamID];
+  }
+
+  //==============================================================
+  // Is Playing
+  //==============================================================
+
+  static bool isPlaying(
+    String streamID,
+  ) {
+    return _playingStreams.contains(streamID);
+  }
+    //==============================================================
+  // Camera
+  //==============================================================
 
   static Future<void> enableCamera(
     bool enable,
   ) async {
-    await ZegoExpressEngine.instance.enableCamera(
-      enable,
-    );
+    try {
+      _cameraEnabled = enable;
+
+      await ZegoExpressEngine.instance.enableCamera(
+        enable,
+      );
+
+      _log("Camera : $enable");
+    } catch (e) {
+      _logError(e);
+    }
   }
 
-  ///------------------------------------------------------------
-  /// Microphone
-  ///------------------------------------------------------------
+  //==============================================================
+  // Microphone
+  //==============================================================
 
   static Future<void> enableMicrophone(
     bool enable,
   ) async {
-    await ZegoExpressEngine.instance.muteMicrophone(
-      !enable,
-    );
+    try {
+      _microphoneEnabled = enable;
+
+      await ZegoExpressEngine.instance.muteMicrophone(
+        !enable,
+      );
+
+      _log("Microphone : $enable");
+    } catch (e) {
+      _logError(e);
+    }
   }
 
-  ///------------------------------------------------------------
-  /// Speaker
-  ///------------------------------------------------------------
+  //==============================================================
+  // Speaker
+  //==============================================================
 
   static Future<void> enableSpeaker(
     bool enable,
   ) async {
-    await ZegoExpressEngine.instance.muteSpeaker(
-      !enable,
-    );
+    try {
+      _speakerEnabled = enable;
+
+      await ZegoExpressEngine.instance.muteSpeaker(
+        !enable,
+      );
+
+      _log("Speaker : $enable");
+    } catch (e) {
+      _logError(e);
+    }
   }
 
-  ///------------------------------------------------------------
-  /// Switch Camera
-  ///------------------------------------------------------------
-
-  static bool _frontCamera = true;
-
-  static bool _cameraEnabled = true;
-static bool _microphoneEnabled = true;
-static bool _speakerEnabled = true;
-
-static bool _beautyEnabled = false;
-static bool _mirrorEnabled = false;
-
-static int _videoWidth = 720;
-static int _videoHeight = 1280;
-static int _videoFps = 30;
-static int _videoBitrate = 1500;
-
-static int? _localViewID;
-
-static final Map<String, int> _remoteViews = {};
+  //==============================================================
+  // Switch Camera
+  //==============================================================
 
   static Future<void> switchCamera() async {
-    _frontCamera = !_frontCamera;
+    try {
+      _frontCamera = !_frontCamera;
 
-    await ZegoExpressEngine.instance.useFrontCamera(
-      _frontCamera,
+      await ZegoExpressEngine.instance.useFrontCamera(
+        _frontCamera,
+      );
+
+      _log(
+        _frontCamera
+            ? "Front Camera"
+            : "Rear Camera",
+      );
+    } catch (e) {
+      _logError(e);
+    }
+  }
+
+  //==============================================================
+  // Video Mirror
+  //==============================================================
+
+  static Future<void> setVideoMirror(
+    bool enable,
+  ) async {
+    try {
+      _mirrorEnabled = enable;
+
+      // Add SDK mirror API here if required.
+
+      _log("Mirror : $enable");
+    } catch (e) {
+      _logError(e);
+    }
+  }
+
+  //==============================================================
+  // Beauty
+  //==============================================================
+
+  static Future<void> enableBeauty(
+    bool enable,
+  ) async {
+    try {
+      _beautyEnabled = enable;
+
+      // Add Zego Effects / Beauty SDK integration here.
+
+      _log("Beauty : $enable");
+    } catch (e) {
+      _logError(e);
+    }
+  }
+
+  //==============================================================
+  // Device Getters
+  //==============================================================
+
+  static bool get isCameraEnabled =>
+      _cameraEnabled;
+
+  static bool get isMicrophoneEnabled =>
+      _microphoneEnabled;
+
+  static bool get isSpeakerEnabled =>
+      _speakerEnabled;
+
+  static bool get isBeautyEnabled =>
+      _beautyEnabled;
+
+  static bool get isMirrorEnabled =>
+      _mirrorEnabled;
+
+  static bool get isFrontCamera =>
+      _frontCamera;
+        //==============================================================
+  // Video Configuration
+  //==============================================================
+
+  static Future<void> setVideoConfig({
+    int width = 720,
+    int height = 1280,
+    int fps = 30,
+    int bitrate = 1800,
+  }) async {
+    try {
+      _videoWidth = width;
+      _videoHeight = height;
+      _videoFPS = fps;
+      _videoBitrate = bitrate;
+
+      final config = ZegoVideoConfig(
+        width,
+        height,
+        width,
+        height,
+        fps,
+        bitrate,
+        ZegoVideoCodecID.Default,
+      );
+
+      await ZegoExpressEngine.instance.setVideoConfig(
+        config,
+      );
+
+      _log(
+        "Video Config : "
+        "${width}x$height "
+        "FPS:$fps "
+        "Bitrate:$bitrate",
+      );
+    } catch (e) {
+      _logError(e);
+    }
+  }
+
+  //==============================================================
+  // HD
+  //==============================================================
+
+  static Future<void> enableHD() async {
+    await setVideoConfig(
+      width: 720,
+      height: 1280,
+      fps: 30,
+      bitrate: 1800,
     );
   }
 
-  //======================================================
-// Video Configuration
-//======================================================
+  //==============================================================
+  // Full HD
+  //==============================================================
 
-static Future<void> setVideoConfig({
-  int width = 720,
-  int height = 1280,
-  int fps = 15,
-  int bitrate = 1200,
-}) async {
-  final config = ZegoVideoConfig(
-    width,      // captureWidth
-    height,     // captureHeight
-    width,      // encodeWidth
-    height,     // encodeHeight
-    fps,        // FPS
-    bitrate,    // Bitrate
-    ZegoVideoCodecID.Default,
-  );
+  static Future<void> enableFullHD() async {
+    await setVideoConfig(
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      bitrate: 2500,
+    );
+  }
 
-  await ZegoExpressEngine.instance.setVideoConfig(config);
+  //==============================================================
+  // Low Network
+  //==============================================================
 
-  debugPrint(
-    "Video Config : ${width}x$height  FPS:$fps  Bitrate:$bitrate",
-  );
-}
+  static Future<void> enableLowNetworkMode() async {
+    await setVideoConfig(
+      width: 360,
+      height: 640,
+      fps: 15,
+      bitrate: 500,
+    );
+  }
 
-static Future<void> enableHD() async {
-  await setVideoConfig(
-    width: 720,
-    height: 1280,
-    fps: 30,
-    bitrate: 1800,
-  );
-}
+  //==============================================================
+  // Custom Video Profile
+  //==============================================================
 
-static Future<void> enableFullHD() async {
-  await setVideoConfig(
-    width: 1080,
-    height: 1920,
-    fps: 30,
-    bitrate: 2500,
-  );
-}
+  static Future<void> setCustomVideoProfile({
+    required int width,
+    required int height,
+    required int fps,
+    required int bitrate,
+  }) async {
+    await setVideoConfig(
+      width: width,
+      height: height,
+      fps: fps,
+      bitrate: bitrate,
+    );
+  }
 
-static Future<void> enableLowNetworkMode() async {
-  await setVideoConfig(
-    width: 360,
-    height: 640,
-    fps: 15,
-    bitrate: 500,
-  );
-}
+  //==============================================================
+  // Video Getters
+  //==============================================================
 
-  ///------------------------------------------------------------
-  /// Video Mirror
-  ///------------------------------------------------------------
+  static int get videoWidth =>
+      _videoWidth;
 
-  static Future<void> setVideoMirror(
-  bool enable,
-) async {
-  _mirrorEnabled = enable;
+  static int get videoHeight =>
+      _videoHeight;
 
-  debugPrint(
-    "Mirror : $_mirrorEnabled",
-  );
-}
+  static int get videoFPS =>
+      _videoFPS;
 
-  ///------------------------------------------------------------
-  /// Beauty
-  ///------------------------------------------------------------
+  static int get videoBitrate =>
+      _videoBitrate;
 
-  static Future<void> enableBeauty(
-  bool enable,
-) async {
-  _beautyEnabled = enable;
+  //==============================================================
+  // Current Information
+  //==============================================================
 
-  debugPrint(
-    "Beauty : $_beautyEnabled",
-  );
-}
+  static String? get currentRoomID =>
+      _currentRoomID;
 
-  ///------------------------------------------------------------
-  /// Event Callbacks
-  ///------------------------------------------------------------
+  static String? get currentUserID =>
+      _currentUserID;
+
+  static String? get currentUserName =>
+      _currentUserName;
+
+  static String? get currentPublishStreamID =>
+      _currentPublishStreamID;
+        //==============================================================
+  // Register Event Callbacks
+  //==============================================================
 
   static void registerCallbacks({
     VoidCallback? onRoomConnected,
@@ -369,24 +907,23 @@ static Future<void> enableLowNetworkMode() async {
     VoidCallback? onPublishStopped,
     VoidCallback? onPlayStarted,
     VoidCallback? onPlayStopped,
-
     ValueChanged<ZegoStreamQualityLevel>? onPublishQuality,
-ValueChanged<ZegoStreamQualityLevel>? onPlayQuality,
-
-ValueChanged<List<ZegoUser>>? onUsersUpdated,
-ValueChanged<List<ZegoStream>>? onStreamsUpdated,
-
-ValueChanged<String>? onBroadcastMessage,
-ValueChanged<String>? onBarrageMessage,
-
+    ValueChanged<ZegoStreamQualityLevel>? onPlayQuality,
+    ValueChanged<List<ZegoUser>>? onUsersUpdated,
+    ValueChanged<List<ZegoStream>>? onStreamsUpdated,
+    ValueChanged<String>? onBroadcastMessage,
+    ValueChanged<String>? onBarrageMessage,
   }) {
-    ZegoExpressEngine.onRoomStateUpdate =
-        (
+    ZegoExpressEngine.onRoomStateUpdate = (
       String roomID,
       ZegoRoomState state,
       int errorCode,
       Map<String, dynamic> extendedData,
     ) {
+      _log(
+        "Room State : $state  Error : $errorCode",
+      );
+
       switch (state) {
         case ZegoRoomState.Connected:
           onRoomConnected?.call();
@@ -400,87 +937,176 @@ ValueChanged<String>? onBarrageMessage,
           break;
       }
     };
+
     ZegoExpressEngine.onPublisherStateUpdate = (
-  String streamID,
-  ZegoPublisherState state,
-  int errorCode,
-  Map<String, dynamic> extendedData,
-) {
-  if (state == ZegoPublisherState.Publishing) {
-    onPublishStarted?.call();
-  }
+      String streamID,
+      ZegoPublisherState state,
+      int errorCode,
+      Map<String, dynamic> extendedData,
+    ) {
+      _log(
+        "Publisher : $state  Error : $errorCode",
+      );
 
-  if (state == ZegoPublisherState.NoPublish) {
-    onPublishStopped?.call();
-  }
-};
-ZegoExpressEngine.onPlayerStateUpdate = (
-  String streamID,
-  ZegoPlayerState state,
-  int errorCode,
-  Map<String, dynamic> extendedData,
-) {
-  if (state == ZegoPlayerState.Playing) {
-    onPlayStarted?.call();
-  }
+      if (state == ZegoPublisherState.Publishing) {
+        onPublishStarted?.call();
+      }
 
-  if (state == ZegoPlayerState.NoPlay) {
-    onPlayStopped?.call();
+      if (state == ZegoPublisherState.NoPublish) {
+        onPublishStopped?.call();
+      }
+    };
+
+    ZegoExpressEngine.onPlayerStateUpdate = (
+      String streamID,
+      ZegoPlayerState state,
+      int errorCode,
+      Map<String, dynamic> extendedData,
+    ) {
+      _log(
+        "Player : $state  Error : $errorCode",
+      );
+
+      if (state == ZegoPlayerState.Playing) {
+        onPlayStarted?.call();
+      }
+
+      if (state == ZegoPlayerState.NoPlay) {
+        onPlayStopped?.call();
+      }
+    };
+
+    ZegoExpressEngine.onNetworkQuality = (
+      String userID,
+      ZegoStreamQualityLevel upstreamQuality,
+      ZegoStreamQualityLevel downstreamQuality,
+    ) {
+      onPublishQuality?.call(
+        upstreamQuality,
+      );
+
+      onPlayQuality?.call(
+        downstreamQuality,
+      );
+    };
+
+    ZegoExpressEngine.onRoomUserUpdate = (
+      String roomID,
+      ZegoUpdateType updateType,
+      List<ZegoUser> userList,
+    ) {
+      _log(
+        "Users Updated : ${userList.length}",
+      );
+
+      onUsersUpdated?.call(
+        userList,
+      );
+    };
+
+    ZegoExpressEngine.onRoomStreamUpdate = (
+      String roomID,
+      ZegoUpdateType updateType,
+      List<ZegoStream> streamList,
+      Map<String, dynamic> extendedData,
+    ) {
+      _log(
+        "Streams Updated : ${streamList.length}",
+      );
+
+      onStreamsUpdated?.call(
+        streamList,
+      );
+    };
+
+    ZegoExpressEngine.onIMRecvBroadcastMessage = (
+      String roomID,
+      List<ZegoBroadcastMessageInfo> messageList,
+    ) {
+      for (final message in messageList) {
+        onBroadcastMessage?.call(
+          message.message,
+        );
+      }
+    };
+
+    ZegoExpressEngine.onIMRecvBarrageMessage = (
+      String roomID,
+      List<ZegoBarrageMessageInfo> messageList,
+    ) {
+      for (final message in messageList) {
+        onBarrageMessage?.call(
+          message.message,
+        );
+      }
+    };
   }
-};
-ZegoExpressEngine.onNetworkQuality = (
-  String userID,
-  ZegoStreamQualityLevel upstreamQuality,
-  ZegoStreamQualityLevel downstreamQuality,
-) {
-  onPublishQuality?.call(upstreamQuality);
-  onPlayQuality?.call(downstreamQuality);
-};
-ZegoExpressEngine.onRoomUserUpdate = (
-  String roomID,
-  ZegoUpdateType updateType,
-  List<ZegoUser> userList,
-) {
-  onUsersUpdated?.call(userList);
-};
-ZegoExpressEngine.onRoomStreamUpdate = (
-  String roomID,
-  ZegoUpdateType updateType,
-  List<ZegoStream> streamList,
-  Map<String, dynamic> extendedData,
-) {
-  onStreamsUpdated?.call(streamList);
-};
-ZegoExpressEngine.onIMRecvBroadcastMessage = (
-  String roomID,
-  List<ZegoBroadcastMessageInfo> messageList,
-) {
-  for (final message in messageList) {
-    onBroadcastMessage?.call(message.message);
-  }
-};
-ZegoExpressEngine.onIMRecvBarrageMessage = (
-  String roomID,
-  List<ZegoBarrageMessageInfo> messageList,
-) {
-  for (final message in messageList) {
-    onBarrageMessage?.call(message.message);
-  }
-};
-  }
-    ///------------------------------------------------------------
-  /// Unregister Callbacks
-  ///------------------------------------------------------------
+    //==============================================================
+  // Unregister Callbacks
+  //==============================================================
 
   static void unregisterCallbacks() {
     ZegoExpressEngine.onRoomStateUpdate = null;
     ZegoExpressEngine.onPublisherStateUpdate = null;
     ZegoExpressEngine.onPlayerStateUpdate = null;
+    ZegoExpressEngine.onNetworkQuality = null;
+    ZegoExpressEngine.onRoomUserUpdate = null;
+    ZegoExpressEngine.onRoomStreamUpdate = null;
+    ZegoExpressEngine.onIMRecvBroadcastMessage = null;
+    ZegoExpressEngine.onIMRecvBarrageMessage = null;
   }
 
-  ///------------------------------------------------------------
-  /// Stop Everything
-  ///------------------------------------------------------------
+  //==============================================================
+  // Send Broadcast Message
+  //==============================================================
+
+  static Future<void> sendBroadcastMessage(
+    String message,
+  ) async {
+    if (!_loggedIn || _currentRoomID == null) {
+      return;
+    }
+
+    try {
+      await ZegoExpressEngine.instance
+          .sendBroadcastMessage(
+        _currentRoomID!,
+        message,
+      );
+
+      _log("Broadcast Message Sent");
+    } catch (e) {
+      _logError(e);
+    }
+  }
+
+  //==============================================================
+  // Send Barrage Message
+  //==============================================================
+
+  static Future<void> sendBarrageMessage(
+    String message,
+  ) async {
+    if (!_loggedIn || _currentRoomID == null) {
+      return;
+    }
+
+    try {
+      await ZegoExpressEngine.instance
+          .sendBarrageMessage(
+        _currentRoomID!,
+        message,
+      );
+
+      _log("Barrage Message Sent");
+    } catch (e) {
+      _logError(e);
+    }
+  }
+
+  //==============================================================
+  // Stop Everything
+  //==============================================================
 
   static Future<void> stopAll() async {
     try {
@@ -492,47 +1118,13 @@ ZegoExpressEngine.onIMRecvBarrageMessage = (
     } catch (_) {}
 
     try {
-      if (_currentRoomID != null) {
-        await stopPlaying(
-          streamID: _currentRoomID!,
-        );
-      }
+      await stopAllPlaying();
     } catch (_) {}
   }
 
-///------------------------------------------------------------
-/// Send Broadcast Message
-///------------------------------------------------------------
-
-static Future<void> sendBroadcastMessage(
-  String message,
-) async {
-  if (!_loggedIn || _currentRoomID == null) return;
-
-  await ZegoExpressEngine.instance.sendBroadcastMessage(
-    _currentRoomID!,
-    message,
-  );
-}
-
-///------------------------------------------------------------
-/// Send Barrage Message
-///------------------------------------------------------------
-
-static Future<void> sendBarrageMessage(
-  String message,
-) async {
-  if (!_loggedIn || _currentRoomID == null) return;
-
-  await ZegoExpressEngine.instance.sendBarrageMessage(
-    _currentRoomID!,
-    message,
-  );
-}
-
-  ///------------------------------------------------------------
-  /// Leave Room
-  ///------------------------------------------------------------
+  //==============================================================
+  // Leave Room
+  //==============================================================
 
   static Future<void> leaveRoom() async {
     try {
@@ -543,30 +1135,16 @@ static Future<void> sendBarrageMessage(
           _currentRoomID!,
         );
       }
+
+      _log("Leave Room Success");
     } catch (e) {
-      debugPrint(
-        "Leave Room Error : $e",
-      );
+      _logError(e);
     }
   }
 
-  ///------------------------------------------------------------
-  /// Reset Local State
-  ///------------------------------------------------------------
-
-  static void reset() {
-    _loggedIn = false;
-
-    _currentRoomID = null;
-    _currentUserID = null;
-    _currentUserName = null;
-
-    _frontCamera = true;
-  }
-
-  ///------------------------------------------------------------
-  /// Dispose Service
-  ///------------------------------------------------------------
+  //==============================================================
+  // Dispose
+  //==============================================================
 
   static Future<void> dispose() async {
     try {
@@ -577,54 +1155,31 @@ static Future<void> sendBarrageMessage(
       reset();
 
       await destroy();
+
+      _log("Service Disposed");
     } catch (e) {
-      debugPrint(
-        "Zego Dispose Error : $e",
-      );
+      _logError(e);
     }
   }
 
-///------------------------------------------------------------
-/// Is Camera Enabled
-///------------------------------------------------------------
+  //==============================================================
+  // Utility Getters
+  //==============================================================
 
-static bool get isCameraEnabled => _cameraEnabled;
+  static Widget? get localPreviewWidget =>
+      _localPreviewWidget;
 
-///------------------------------------------------------------
-/// Is Microphone Enabled
-///------------------------------------------------------------
+  static bool get hasLocalPreview =>
+      _localPreviewWidget != null;
 
-static bool get isMicrophoneEnabled => _microphoneEnabled;
+  static bool get hasPublishedStream =>
+      _currentPublishStreamID != null;
 
-///------------------------------------------------------------
-/// Is Speaker Enabled
-///------------------------------------------------------------
+  static List<String> get playingStreams =>
+      _playingStreams.toList(growable: false);
 
-static bool get isSpeakerEnabled => _speakerEnabled;
-
-///------------------------------------------------------------
-/// Is Beauty Enabled
-///------------------------------------------------------------
-
-static bool get isBeautyEnabled => _beautyEnabled;
-
-///------------------------------------------------------------
-/// Is Mirror Enabled
-///------------------------------------------------------------
-
-static bool get isMirrorEnabled => _mirrorEnabled;
-
-  ///------------------------------------------------------------
-  /// Getters
-  ///------------------------------------------------------------
-
-  static String? get currentRoomID => _currentRoomID;
-
-  static String? get currentUserID => _currentUserID;
-
-  static String? get currentUserName => _currentUserName;
-
-  static bool get isEngineInitialized => _initialized;
-
-  static bool get isRoomLoggedIn => _loggedIn;
+  static bool get isEngineReady =>
+      _initialized &&
+      _engineStatus ==
+          ZegoEngineStatus.initialized;
 }

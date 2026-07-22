@@ -40,7 +40,6 @@ class LiveRoomController extends ChangeNotifier {
   /// Local State & UI Controllers
   ///------------------------------------------------------------
 
-  // FIX 1: messageController add kiya jo LiveRoomScreen ke chat input me use ho raha hai
   final TextEditingController messageController = TextEditingController();
 
   bool _initialized = false;
@@ -51,11 +50,13 @@ class LiveRoomController extends ChangeNotifier {
   bool _speakerOn = true;
 
   bool _connected = false;
-bool _reconnecting = false;
+  bool _reconnecting = false;
 
-String _connectionText = "Connecting...";
+  bool _isDisposed = false;
 
-int _networkQuality = 0;
+  String _connectionText = "Connecting...";
+
+  int _networkQuality = 0;
 
   int _viewerCount = 0;
   int _likes = 0;
@@ -92,11 +93,11 @@ int _networkQuality = 0;
 
   bool get connected => _connected;
 
-bool get reconnecting => _reconnecting;
+  bool get reconnecting => _reconnecting;
 
-String get connectionText => _connectionText;
+  String get connectionText => _connectionText;
 
-int get networkQuality => _networkQuality;
+  int get networkQuality => _networkQuality;
 
   int get viewerCount => _viewerCount;
 
@@ -118,6 +119,15 @@ int get networkQuality => _networkQuality;
   int get totalMessages => _messages.length;
 
   ///------------------------------------------------------------
+  /// Safe Notify Listeners (BADLAV 1: Crashing se bachane ke liye)
+  ///------------------------------------------------------------
+  void safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  ///------------------------------------------------------------
   /// Initialize Live Room
   ///------------------------------------------------------------
 
@@ -125,7 +135,7 @@ int get networkQuality => _networkQuality;
     if (_initialized) return;
 
     _loading = true;
-    notifyListeners();
+    safeNotifyListeners();
 
     try {
       await ZegoService.loginRoom(
@@ -134,30 +144,31 @@ int get networkQuality => _networkQuality;
         userName: userName,
       );
 
+      // BADLAV 2: Zego callbacks ke andar notifyListeners को safeNotifyListeners se badla
       ZegoService.registerCallbacks(
-  onRoomConnected: () {
-    _connected = true;
-    _reconnecting = false;
-    _connectionText = "Connected";
-    notifyListeners();
-  },
+        onRoomConnected: () {
+          _connected = true;
+          _reconnecting = false;
+          _connectionText = "Connected";
+          safeNotifyListeners();
+        },
 
-  onRoomDisconnected: () {
-    _connected = false;
-    _connectionText = "Disconnected";
-    notifyListeners();
-  },
+        onRoomDisconnected: () {
+          _connected = false;
+          _connectionText = "Disconnected";
+          safeNotifyListeners();
+        },
 
-  onPublishQuality: (quality) {
-    _networkQuality = quality.index;
-    notifyListeners();
-  },
+        onPublishQuality: (quality) {
+          _networkQuality = quality.index;
+          safeNotifyListeners();
+        },
 
-  onPlayQuality: (quality) {
-    _networkQuality = quality.index;
-    notifyListeners();
-  },
-);
+        onPlayQuality: (quality) {
+          _networkQuality = quality.index;
+          safeNotifyListeners();
+        },
+      );
 
       if (isHost) {
         await _initializeHost();
@@ -170,8 +181,8 @@ int get networkQuality => _networkQuality;
       _listenGifts();
 
       _connected = true;
-_reconnecting = false;
-_connectionText = "Connected";
+      _reconnecting = false;
+      _connectionText = "Connected";
 
       _initialized = true;
     } catch (e) {
@@ -181,7 +192,7 @@ _connectionText = "Connected";
     }
 
     _loading = false;
-    notifyListeners();
+    safeNotifyListeners();
   }
 
   ///------------------------------------------------------------
@@ -253,7 +264,7 @@ _connectionText = "Connected";
 
       _diamonds = data["diamonds"] ?? 0;
 
-      notifyListeners();
+      safeNotifyListeners();
     });
   }
 
@@ -286,7 +297,7 @@ _connectionText = "Connected";
         }
       }
 
-      notifyListeners();
+      safeNotifyListeners();
     });
   }
 
@@ -331,7 +342,6 @@ _connectionText = "Connected";
     );
 
     try {
-      // Input field ko clear karne ke liye
       messageController.clear();
       
       await _chatService.sendMessage(
@@ -349,13 +359,10 @@ _connectionText = "Connected";
   /// Send Like / Heart
   ///------------------------------------------------------------
 
-  // FIX 2: sendHeart method banaya jo aapke existing sendLike logic ko execute karega
   Future<void> sendHeart() async {
-    // Local UI update taaki fast response mile
     _likes++;
-    notifyListeners();
+    safeNotifyListeners();
     
-    // Server/Firebase stream call
     await sendLike();
   }
 
@@ -381,9 +388,8 @@ _connectionText = "Connected";
     required int diamonds,
   }) async {
     try {
-      // Local state real-time update karne ke liye
       _diamonds += diamonds;
-      notifyListeners();
+      safeNotifyListeners();
 
       await _chatService.sendGift(
         liveId: live.liveId,
@@ -412,7 +418,7 @@ _connectionText = "Connected";
         _cameraOn,
       );
 
-      notifyListeners();
+      safeNotifyListeners();
     } catch (e) {
       _cameraOn = !_cameraOn;
 
@@ -420,7 +426,7 @@ _connectionText = "Connected";
         "Camera Error : $e",
       );
 
-      notifyListeners();
+      safeNotifyListeners();
     }
   }
 
@@ -428,7 +434,6 @@ _connectionText = "Connected";
   /// Microphone / Audio Mute
   ///------------------------------------------------------------
 
-  // FIX 3: toggleMute method add kiya jo aapke toggleMicrophone ko target karega
   Future<void> toggleMute() async {
     await toggleMicrophone();
   }
@@ -441,7 +446,7 @@ _connectionText = "Connected";
         _micOn,
       );
 
-      notifyListeners();
+      safeNotifyListeners();
     } catch (e) {
       _micOn = !_micOn;
 
@@ -449,7 +454,7 @@ _connectionText = "Connected";
         "Microphone Error : $e",
       );
 
-      notifyListeners();
+      safeNotifyListeners();
     }
   }
 
@@ -465,7 +470,7 @@ _connectionText = "Connected";
         _speakerOn,
       );
 
-      notifyListeners();
+      safeNotifyListeners();
     } catch (e) {
       _speakerOn = !_speakerOn;
 
@@ -473,7 +478,7 @@ _connectionText = "Connected";
         "Speaker Error : $e",
       );
 
-      notifyListeners();
+      safeNotifyListeners();
     }
   }
 
@@ -612,7 +617,7 @@ _connectionText = "Connected";
     _likes = live.likes;
     _diamonds = live.diamonds;
 
-    notifyListeners();
+    safeNotifyListeners();
   }
 
   ///------------------------------------------------------------
@@ -635,7 +640,7 @@ _connectionText = "Connected";
 
     messageController.clear();
 
-    notifyListeners();
+    safeNotifyListeners();
   }
 
   ///------------------------------------------------------------
@@ -657,36 +662,36 @@ _connectionText = "Connected";
   ///------------------------------------------------------------
 
   Future<void> reconnect() async {
-  if (_reconnecting) return;
+    if (_reconnecting) return;
 
-  _reconnecting = true;
-  _connectionText = "Reconnecting...";
-  notifyListeners();
+    _reconnecting = true;
+    _connectionText = "Reconnecting...";
+    safeNotifyListeners();
 
-  try {
-    await leaveRoom();
+    try {
+      await leaveRoom();
 
-    await Future.delayed(
-      const Duration(seconds: 2),
-    );
+      await Future.delayed(
+        const Duration(seconds: 2),
+      );
 
-    await initialize();
+      await initialize();
 
-    _connected = true;
-    _reconnecting = false;
-    _connectionText = "Connected";
-  } catch (e) {
-    _connected = false;
-    _reconnecting = false;
-    _connectionText = "Reconnect Failed";
+      _connected = true;
+      _reconnecting = false;
+      _connectionText = "Connected";
+    } catch (e) {
+      _connected = false;
+      _reconnecting = false;
+      _connectionText = "Reconnect Failed";
 
-    debugPrint(
-      "Reconnect Error : $e",
-    );
+      debugPrint(
+        "Reconnect Error : $e",
+      );
+    }
+
+    safeNotifyListeners();
   }
-
-  notifyListeners();
-}
 
   ///------------------------------------------------------------
   /// Close Controller
@@ -712,7 +717,8 @@ _connectionText = "Connected";
 
   @override
   void dispose() {
-    // FIX 4: messageController ko safely dispose kiya memory leaks rokne ke liye
+    _isDisposed = true; 
+
     messageController.dispose();
     _cancelSubscriptions();
     _messages.clear();
